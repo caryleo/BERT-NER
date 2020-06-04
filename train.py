@@ -13,12 +13,12 @@ from SequenceTagger import BertForSequenceTagging
 from transformers.optimization import get_linear_schedule_with_warmup, AdamW
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='conll', help="Directory containing the dataset")
-parser.add_argument('--seed', type=int, default=2019, help="random seed for initialization")
+parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
 parser.add_argument('--restore_dir', default=None,
                     help="Optional, name of the directory containing weights to reload before training, e.g., 'experiments/conll/'")
 

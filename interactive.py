@@ -13,9 +13,9 @@ from SequenceTagger import BertForSequenceTagging
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='msra', help="Directory containing the dataset")
-parser.add_argument('--seed', type=int, default=23, help="random seed for initialization")
+parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def interAct(model, data_iterator, params, mark='Interactive', verbose=False):
     """Evaluate the model on `steps` batches."""

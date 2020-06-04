@@ -11,11 +11,11 @@ from SequenceTagger import BertForSequenceTagging
 from metrics import f1_score, get_entities, classification_report
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='conll', help="Directory containing the dataset")
-parser.add_argument('--seed', type=int, default=23, help="random seed for initialization")
+parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
 
 
 def evaluate(model, data_iterator, params, mark='Eval', verbose=False):
