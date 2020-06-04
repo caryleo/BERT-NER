@@ -17,6 +17,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='conll', help="Directory containing the dataset")
 parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
 
+# test for git push
+
 
 def evaluate(model, data_iterator, params, mark='Eval', verbose=False):
     """Evaluate the model on `steps` batches."""
