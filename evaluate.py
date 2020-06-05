@@ -56,6 +56,7 @@ def evaluate(model, data_iterator, params, mark='Eval', verbose=False):
             batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[
                 1]  # list of the tag index of each word e./[0,0,1,2,1],denoting the index of a tag.
             batch_output_argmax = [batch_output]  # only for batch_size=1,to be modified later.
+
         loss_avg.update(loss.item())
 
         batch_tags = batch_tags.to('cpu').numpy()

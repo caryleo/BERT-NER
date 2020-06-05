@@ -6,6 +6,9 @@
     "weight_decay": 0.01,
     "clip_grad": 5,
 
+    "lr0_crf": 8e-5,
+    "weight_decay_crf": 0.005,
+
     "batch_size": 32,
     "epoch_num": 20,
     "min_epoch_num": 5,

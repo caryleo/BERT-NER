@@ -209,16 +209,16 @@ if __name__ == '__main__':
                 {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay) \
                             and not any(nd in n for nd in new_param)], 'weight_decay': 0.0},
                 {'params': [p for n, p in param_optimizer if n in ('transitions', 'classifier.weight')] \
-                    , 'lr': args.lr0_crf, 'weight_decay': args.weight_decay_crf},
+                    , 'lr': params.lr0_crf, 'weight_decay': params.weight_decay_crf},
                 {'params': [p for n, p in param_optimizer if n == 'classifier.bias'] \
-                    , 'lr': args.lr0_crf, 'weight_decay': 0.0}
+                    , 'lr': params.lr0_crf, 'weight_decay': 0.0}
             ]
         else:  # only finetune the head classifier and vitebi
             optimizer_grouped_parameters = [
                 {'params': [p for n, p in param_optimizer if n in ('transitions', 'classifier.weight')] \
-                    , 'lr': args.lr0_crf, 'weight_decay': args.weight_decay_crf},
+                    , 'lr': params.lr0_crf, 'weight_decay': params.weight_decay_crf},
                 {'params': [p for n, p in param_optimizer if n == 'classifier.bias'] \
-                    , 'lr': args.lr0_crf, 'weight_decay': 0.0}]
+                    , 'lr': params.lr0_crf, 'weight_decay': 0.0}]
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=params.learning_rate, correct_bias=False)
     train_steps_per_epoch = params.train_size // params.batch_size
