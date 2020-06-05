@@ -10,8 +10,8 @@ from tqdm import trange
 from evaluate import evaluate
 from data_loader import DataLoader
 from SequenceTagger import BertForSequenceTagging
+from CRFTagger import BertForCRFTagging
 from transformers.optimization import get_linear_schedule_with_warmup, AdamW
-
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -21,6 +21,7 @@ parser.add_argument('--dataset', default='conll', help="Directory containing the
 parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
 parser.add_argument('--restore_dir', default=None,
                     help="Optional, name of the directory containing weights to reload before training, e.g., 'experiments/conll/'")
+parser.add_argument('--model', default='linear', choices=['linear', 'crf'], help="The Model we want to use")
 
 
 def train_epoch(model, data_iterator, optimizer, scheduler, params):
@@ -30,16 +31,23 @@ def train_epoch(model, data_iterator, optimizer, scheduler, params):
 
     # a running average object for loss
     loss_avg = utils.RunningAverage()
-    
+
     # Use tqdm for progress bar
     one_epoch = trange(params.train_steps)
     for batch in one_epoch:
         # fetch the next training batch
         batch_data, batch_token_starts, batch_tags = next(data_iterator)
-        batch_masks = batch_data.gt(0) # get padding mask
+        batch_masks = batch_data.gt(0)  # get padding mask
 
         # compute model output and loss
-        loss = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks, labels=batch_tags)[0]
+        if params.model == 'linear':
+            loss = \
+            model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks, labels=batch_tags)[
+                0]
+        else:
+            batch_tags_crf = batch_tags.squeeze(0)
+            loss = model.neg_log_likelihood((batch_data, batch_token_starts), token_type_ids=None,
+                                            attention_mask=batch_masks, labels=batch_tags_crf)
 
         # clear previous gradients, compute gradients of all variables wrt loss
         model.zero_grad()
@@ -55,14 +63,17 @@ def train_epoch(model, data_iterator, optimizer, scheduler, params):
         # update the average loss
         loss_avg.update(loss.item())
         one_epoch.set_postfix(loss='{:05.3f}'.format(loss_avg()))
-    
+
 
 def train_and_evaluate(model, train_data, val_data, optimizer, scheduler, params, model_dir, restore_dir=None):
     """Train the model and evaluate every epoch."""
     # reload weights from restore_dir if specified
     if restore_dir is not None:
-        model = BertForSequenceTagging.from_pretrained(tagger_model_dir)
-        
+        if params.model == 'linear':
+            model = BertForSequenceTagging.from_pretrained(tagger_model_dir)
+        else:
+            model = BertForCRFTagging.from_pretrained(tagger_model_dir)
+
     best_val_f1 = 0.0
     patience_counter = 0
 
@@ -89,10 +100,10 @@ def train_and_evaluate(model, train_data, val_data, optimizer, scheduler, params
         # train_metrics = evaluate(model, train_data_iterator, params, mark='Train') # callback train f1
         params.eval_steps = params.val_steps
         val_metrics = evaluate(model, val_data_iterator, params, mark='Val')
-        
+
         val_f1 = val_metrics['f1']
         improve_f1 = val_f1 - best_val_f1
-        if improve_f1 > 1e-5:    
+        if improve_f1 > 1e-5:
             logging.info("- Found new best F1")
             best_val_f1 = val_f1
             model.save_pretrained(model_dir)
@@ -107,7 +118,7 @@ def train_and_evaluate(model, train_data, val_data, optimizer, scheduler, params
         if (patience_counter >= params.patience_num and epoch > params.min_epoch_num) or epoch == params.epoch_num:
             logging.info("Best val f1: {:05.2f}".format(best_val_f1))
             break
-        
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -126,25 +137,26 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
 
     params.seed = args.seed
-    
+    params.model = args.model
+
     # Set the logger
     utils.set_logger(os.path.join(tagger_model_dir, 'train.log'))
     logging.info("device: {}".format(params.device))
 
     # Create the input data pipeline
-    
+
     # Initialize the DataLoader
     data_dir = 'data/' + args.dataset
 
     if args.dataset in ["conll"]:
-        bert_class = 'bert-base-cased' # auto
+        bert_class = 'bert-base-cased'  # auto
         # bert_class = 'pretrained_bert_models/bert-base-cased/' # manual
     elif args.dataset in ["msra"]:
-        bert_class = 'bert-base-chinese' # auto
+        bert_class = 'bert-base-chinese'  # auto
         # bert_class = 'pretrained_bert_models/bert-base-chinese/' # manual
-    
+
     data_loader = DataLoader(data_dir, bert_class, params, token_pad_idx=0, tag_pad_idx=-1)
-    
+
     logging.info("Loading the datasets...")
 
     # Load training data and test data
@@ -154,11 +166,14 @@ if __name__ == '__main__':
     # Specify the training and validation dataset sizes
     params.train_size = train_data['size']
     params.val_size = val_data['size']
-    
+
     logging.info("Loading BERT model...")
 
     # Prepare model
-    model = BertForSequenceTagging.from_pretrained(bert_class, num_labels=len(params.tag2idx))
+    if params.model == 'linear':
+        model = BertForSequenceTagging.from_pretrained(bert_class, num_labels=len(params.tag2idx))
+    else:
+        model = BertForCRFTagging.from_pretrained(bert_class, num_label=len(params.tag2idx))
     model.to(params.device)
 
     # Prepare optimizer
@@ -166,19 +181,35 @@ if __name__ == '__main__':
         param_optimizer = list(model.named_parameters())
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
         optimizer_grouped_parameters = [
-            {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 
+            {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)],
              'weight_decay': params.weight_decay},
-            {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 
+            {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)],
              'weight_decay': 0.0}
         ]
-    else: # only finetune the head classifier
-        param_optimizer = list(model.classifier.named_parameters()) 
-        optimizer_grouped_parameters = [{'params': [p for n, p in param_optimizer]}]
-    
+        if params.model == 'crf':
+            new_param = ['transitions', 'classifier.weight', 'classifier.bias']
+            optimizer_grouped_parameters = optimizer_grouped_parameters + [
+                {'params': [p for n, p in param_optimizer if n in ('transitions', 'classifier.weight')],
+                 'lr': params.lr0_crf, 'weight_decay': params.weight_decay_crf},
+                {'params': [p for n, p in param_optimizer if n == 'classifier.bias'],
+                 'lr': params.lr0_crf, 'weight_decay': 0.0}
+            ]
+
+    else:  # only finetune the head classifier
+        param_optimizer = list(model.classifier.named_parameters())
+        if params.mode == 'crf':
+            optimizer_grouped_parameters = [
+                {'params': [p for n, p in param_optimizer if n in ('transitions', 'classifier.weight')],
+                 'lr': params.lr0_crf, 'weight_decay': params.weight_decay_crf},
+                {'params': [p for n, p in param_optimizer if n == 'classifier.bias'],
+                 'lr': params.lr0_crf, 'weight_decay': 0.0}]
+        else:
+            optimizer_grouped_parameters = [{'params': [p for n, p in param_optimizer]}]
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=params.learning_rate, correct_bias=False)
     train_steps_per_epoch = params.train_size // params.batch_size
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=train_steps_per_epoch, num_training_steps=params.epoch_num * train_steps_per_epoch)
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=train_steps_per_epoch,
+                                                num_training_steps=params.epoch_num * train_steps_per_epoch)
 
     # Train and evaluate the model
     logging.info("Starting training for {} epoch(s)".format(params.epoch_num))

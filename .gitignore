@@ -105,3 +105,9 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+.idea/BERT-NER-2.iml
+.idea/inspectionProfiles/
+.idea/misc.xml
+.idea/modules.xml
+.idea/other.xml
+.idea/vcs.xml

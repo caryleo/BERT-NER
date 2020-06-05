@@ -8,6 +8,7 @@ import argparse
 import numpy as np
 from data_loader import DataLoader
 from SequenceTagger import BertForSequenceTagging
+from CRFTagger import BertForCRFTagging
 from metrics import f1_score, get_entities, classification_report
 
 
@@ -16,6 +17,7 @@ from metrics import f1_score, get_entities, classification_report
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='conll', help="Directory containing the dataset")
 parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
+parser.add_argument('--model', default='linear', choices=['linear', 'crf'], help="The Model we want to use")
 
 # test for git push
 
@@ -37,8 +39,13 @@ def evaluate(model, data_iterator, params, mark='Eval', verbose=False):
         # fetch the next evaluation batch
         batch_data, batch_token_starts, batch_tags = next(data_iterator)
         batch_masks = batch_data.gt(0)
-        
-        loss = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks, labels=batch_tags)[0]
+
+        if params.model == 'linear':
+            loss = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks, labels=batch_tags)[0]
+        else:
+            batch_tags_crf = batch_tags.squeeze(0)
+            loss = model.neg_log_likelihood((batch_data, batch_token_starts), token_type_ids=None,
+                                            attention_mask=batch_masks, labels=batch_tags_crf)
         loss_avg.update(loss.item())
         
         batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[0]  # shape: (batch_size, max_len, num_labels)
