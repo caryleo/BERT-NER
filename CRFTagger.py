@@ -16,20 +16,19 @@ class BertForCRFTagging(BertPreTrainedModel):
     def load_option(self, opt):
         self.model = opt.model
         self.device = opt.device
-        if self.model == 'crf':
-            self.sigmoid = nn.Sigmoid()
-            self.START_TAG = "<START>"
-            self.STOP_TAG = "<STOP>"
-            self.tag_to_ix = opt.tag2idx
-            # Matrix of transition parameters.  Entry i,j is the score of
-            # transitioning *to* i *from* j.
-            self.transitions = nn.Parameter(
-                torch.randn(self.num_labels, self.num_labels))
+        self.sigmoid = nn.Sigmoid()
+        self.START_TAG = "<START>"
+        self.STOP_TAG = "<STOP>"
+        self.tag_to_ix = opt.tag2idx
+        # Matrix of transition parameters.  Entry i,j is the score of
+        # transitioning *to* i *from* j.
+        self.transitions = nn.Parameter(
+            torch.randn(self.num_labels, self.num_labels))
 
-            # These two statements enforce the constraint that we never transfer
-            # to the start tag and we never transfer from the stop tag
-            self.transitions.data[self.tag_to_ix[self.START_TAG], :] = -10000
-            self.transitions.data[:, self.tag_to_ix[self.STOP_TAG]] = -10000
+        # These two statements enforce the constraint that we never transfer
+        # to the start tag and we never transfer from the stop tag
+        self.transitions.data[self.tag_to_ix[self.START_TAG], :] = -10000
+        self.transitions.data[:, self.tag_to_ix[self.STOP_TAG]] = -10000
 
     def _get_bert_features(self, input_data, token_type_ids=None, attention_mask=None, labels=None,
                            position_ids=None, inputs_embeds=None, head_mask=None):
@@ -58,9 +57,9 @@ class BertForCRFTagging(BertPreTrainedModel):
         #### 'X' label Issue End ####
 
         logits = self.classifier(padded_sequence_output)
-        if self.CRF:
+        # if self.CRF:
             # logits = self.sigmoid(logits)  # 输出是概率
-            logits = logits.squeeze(0)
+        logits = logits.squeeze(0)
         return logits
 
     def _forward_alg(self, feats):
@@ -160,23 +159,23 @@ class BertForCRFTagging(BertPreTrainedModel):
                 position_ids=None, inputs_embeds=None, head_mask=None):
         logits = self._get_bert_features(input_data, token_type_ids, attention_mask, labels,
                                          position_ids, inputs_embeds, head_mask)
-        if self.CRF:
+        # if self.CRF:
             # logits = self.sigmoid(logits)  # 输出是概率
-            score, label_seq_ids = self._viterbi_decode(logits)
-            return score, label_seq_ids
-        else:
-            outputs = (logits,)
-            if labels is not None:
-                loss_mask = labels.gt(-1)
-                loss_fct = CrossEntropyLoss()
-                # Only keep active parts of the loss
-                if loss_mask is not None:
-                    active_loss = loss_mask.view(-1) == 1
-                    active_logits = logits.view(-1, self.num_labels)[active_loss]
-                    active_labels = labels.view(-1)[active_loss]
-                    loss = loss_fct(active_logits, active_labels)
-                else:
-                    loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-                outputs = (loss,) + outputs
-
-            return outputs  # (loss), scores
+        score, label_seq_ids = self._viterbi_decode(logits)
+        return score, label_seq_ids
+        # else:
+        #     outputs = (logits,)
+        #     if labels is not None:
+        #         loss_mask = labels.gt(-1)
+        #         loss_fct = CrossEntropyLoss()
+        #         # Only keep active parts of the loss
+        #         if loss_mask is not None:
+        #             active_loss = loss_mask.view(-1) == 1
+        #             active_logits = logits.view(-1, self.num_labels)[active_loss]
+        #             active_labels = labels.view(-1)[active_loss]
+        #             loss = loss_fct(active_logits, active_labels)
+        #         else:
+        #             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+        #         outputs = (loss,) + outputs
+        #
+        #     return outputs  # (loss), scores

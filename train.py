@@ -22,8 +22,6 @@ parser.add_argument('--seed', type=int, default=2020, help="random seed for init
 parser.add_argument('--restore_dir', default=None,
                     help="Optional, name of the directory containing weights to reload before training, e.g., 'experiments/conll/'")
 parser.add_argument('--model', default='linear', choices=['linear', 'crf'], help="The Model we want to use")
-parser.add_argument('--lr0_crf', default=8e-5, help="learning rate for optimizing transitions and classifier")
-parser.add_argument('--weight_decay_crf', default=0.005, help="weight decay for optimizing CRF parameters")
 
 
 def train_epoch(model, data_iterator, optimizer, scheduler, params):
