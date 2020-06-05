@@ -16,6 +16,8 @@ class BertForCRFTagging(BertPreTrainedModel):
     def load_option(self, opt):
         self.model = opt.model
         self.device = opt.device
+        # self.CRF = True
+        # if self.CRF:
         self.sigmoid = nn.Sigmoid()
         self.START_TAG = "<START>"
         self.STOP_TAG = "<STOP>"
