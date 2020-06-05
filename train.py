@@ -22,8 +22,8 @@ parser.add_argument('--seed', type=int, default=2020, help="random seed for init
 parser.add_argument('--restore_dir', default=None,
                     help="Optional, name of the directory containing weights to reload before training, e.g., 'experiments/conll/'")
 parser.add_argument('--model', default='linear', choices=['linear', 'crf'], help="The Model we want to use")
-
-
+parser.add_argument('--lr0_crf',default=8e-5,help="learning rate for optimizing transitions and classifier")
+parser.add_argument('--weight_decay_crf',default= 0.005,help="weight decay for optimizing CRF parameters")
 def train_epoch(model, data_iterator, optimizer, scheduler, params):
     """Train the model on `steps` batches"""
     # set model to training mode
@@ -122,6 +122,7 @@ def train_and_evaluate(model, train_data, val_data, optimizer, scheduler, params
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    # args.model='crf'
     tagger_model_dir = 'experiments/' + args.dataset
 
     # Load the parameters from json file
@@ -173,7 +174,8 @@ if __name__ == '__main__':
     if params.model == 'linear':
         model = BertForSequenceTagging.from_pretrained(bert_class, num_labels=len(params.tag2idx))
     else:
-        model = BertForCRFTagging.from_pretrained(bert_class, num_label=len(params.tag2idx))
+        model = BertForCRFTagging.from_pretrained(bert_class, num_labels=len(params.tag2idx))
+        model.load_option(params)
     model.to(params.device)
 
     # Prepare optimizer
@@ -190,9 +192,9 @@ if __name__ == '__main__':
             new_param = ['transitions', 'classifier.weight', 'classifier.bias']
             optimizer_grouped_parameters = optimizer_grouped_parameters + [
                 {'params': [p for n, p in param_optimizer if n in ('transitions', 'classifier.weight')],
-                 'lr': params.lr0_crf, 'weight_decay': params.weight_decay_crf},
+                 'lr': args.lr0_crf, 'weight_decay': args.weight_decay_crf},
                 {'params': [p for n, p in param_optimizer if n == 'classifier.bias'],
-                 'lr': params.lr0_crf, 'weight_decay': 0.0}
+                 'lr': args.lr0_crf, 'weight_decay': 0.0}
             ]
 
     else:  # only finetune the head classifier
@@ -200,9 +202,9 @@ if __name__ == '__main__':
             param_optimizer = list(model.named_parameters())
             optimizer_grouped_parameters = [
                 {'params': [p for n, p in param_optimizer if n in ('transitions', 'classifier.weight')],
-                 'lr': params.lr0_crf, 'weight_decay': params.weight_decay_crf},
+                 'lr': args.lr0_crf, 'weight_decay': args.weight_decay_crf},
                 {'params': [p for n, p in param_optimizer if n == 'classifier.bias'],
-                 'lr': params.lr0_crf, 'weight_decay': 0.0}]
+                 'lr': args.lr0_crf, 'weight_decay': 0.0}]
         else:
             param_optimizer = list(model.classifier.named_parameters())
             optimizer_grouped_parameters = [{'params': [p for n, p in param_optimizer]}]

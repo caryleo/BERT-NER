@@ -11,13 +11,13 @@ from SequenceTagger import BertForSequenceTagging
 from CRFTagger import BertForCRFTagging
 from metrics import f1_score, get_entities, classification_report
 
-
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='conll', help="Directory containing the dataset")
 parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
 parser.add_argument('--model', default='linear', choices=['linear', 'crf'], help="The Model we want to use")
+
 
 # test for git push
 
@@ -41,19 +41,26 @@ def evaluate(model, data_iterator, params, mark='Eval', verbose=False):
         batch_masks = batch_data.gt(0)
 
         if params.model == 'linear':
-            loss = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks, labels=batch_tags)[0]
+            loss = \
+                model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks,
+                      labels=batch_tags)[
+                    0]
+            batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[
+                0]  # shape: (batch_size, max_len, num_labels)
+            batch_output = batch_output.detach().cpu().numpy()  # must sent to cpu to use numpy
+            batch_output_argmax = np.argmax(batch_output, axis=2)
         else:
             batch_tags_crf = batch_tags.squeeze(0)
             loss = model.neg_log_likelihood((batch_data, batch_token_starts), token_type_ids=None,
                                             attention_mask=batch_masks, labels=batch_tags_crf)
+            batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[
+                1]  # list of the tag index of each word e./[0,0,1,2,1],denoting the index of a tag.
+            batch_output_argmax = [batch_output]  # only for batch_size=1,to be modified later.
         loss_avg.update(loss.item())
-        
-        batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[0]  # shape: (batch_size, max_len, num_labels)
-        
-        batch_output = batch_output.detach().cpu().numpy()
-        batch_tags = batch_tags.to('cpu').numpy()
 
-        pred_tags.extend([[idx2tag.get(idx) for idx in indices] for indices in np.argmax(batch_output, axis=2)])
+        # batch_tags = batch_tags.to('cpu').numpy()
+
+        pred_tags.extend([[idx2tag.get(idx) for idx in indices] for indices in batch_output_argmax])
         true_tags.extend([[idx2tag.get(idx) if idx != -1 else 'O' for idx in indices] for indices in batch_tags])
 
     assert len(pred_tags) == len(true_tags)
@@ -71,6 +78,7 @@ def evaluate(model, data_iterator, params, mark='Eval', verbose=False):
         logging.info(report)
     return metrics
 
+
 def interAct(model, data_iterator, params, mark='Interactive', verbose=False):
     """Evaluate the model on `steps` batches."""
     # set model to evaluation mode
@@ -84,21 +92,22 @@ def interAct(model, data_iterator, params, mark='Interactive', verbose=False):
     # a running average object for loss
     loss_avg = utils.RunningAverage()
 
-
     batch_data, batch_token_starts = next(data_iterator)
     batch_masks = batch_data.gt(0)
-        
-    batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[0]  # shape: (batch_size, max_len, num_labels)
-        
+
+    batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[
+        0]  # shape: (batch_size, max_len, num_labels)
+
     batch_output = batch_output.detach().cpu().numpy()
 
     pred_tags.extend([[idx2tag.get(idx) for idx in indices] for indices in np.argmax(batch_output, axis=2)])
-    
-    return(get_entities(pred_tags))
+
+    return (get_entities(pred_tags))
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    
+
     tagger_model_dir = 'experiments/' + args.dataset
     # Load the parameters from json file
     json_path = os.path.join(tagger_model_dir, 'params.json')
@@ -112,6 +121,7 @@ if __name__ == '__main__':
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     params.seed = args.seed
+    params.model = args.model
 
     # Set the logger
     utils.set_logger(os.path.join(tagger_model_dir, 'evaluate.log'))
@@ -123,10 +133,10 @@ if __name__ == '__main__':
     data_dir = 'data/' + args.dataset
 
     if args.dataset in ["conll"]:
-        bert_class = 'bert-base-cased' # auto
+        bert_class = 'bert-base-cased'  # auto
         # bert_class = 'pretrained_bert_models/bert-base-cased/' # manual
     elif args.dataset in ["msra"]:
-        bert_class = 'bert-base-chinese' # auto
+        bert_class = 'bert-base-chinese'  # auto
         # bert_class = 'pretrained_bert_models/bert-base-chinese/' # manual
 
     data_loader = DataLoader(data_dir, bert_class, params, token_pad_idx=0, tag_pad_idx=-1)
@@ -147,4 +157,3 @@ if __name__ == '__main__':
 
     logging.info("Starting evaluation...")
     test_metrics = evaluate(model, test_data_iterator, params, mark='Test', verbose=True)
-
