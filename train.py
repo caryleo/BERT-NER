@@ -45,8 +45,7 @@ def train_epoch(model, data_iterator, optimizer, scheduler, params):
         if params.model == 'linear':
             loss = \
                 model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks,
-                      labels=batch_tags)[
-                    0]
+                      labels=batch_tags)[0]
         else:
             batch_tags_crf = batch_tags.squeeze(0)
             loss = model.neg_log_likelihood((batch_data, batch_token_starts), token_type_ids=None,
@@ -142,6 +141,9 @@ if __name__ == '__main__':
 
     params.seed = args.seed
     params.model = args.model
+
+    if params.model == 'crf':  # crf only work on batch_size=1 now
+        params.batch_size = 1
 
     # Set the logger
     utils.set_logger(os.path.join(tagger_model_dir, 'train.log'))
