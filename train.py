@@ -196,14 +196,15 @@ if __name__ == '__main__':
             ]
 
     else:  # only finetune the head classifier
-        param_optimizer = list(model.classifier.named_parameters())
         if params.mode == 'crf':
+            param_optimizer = list(model.named_parameters())
             optimizer_grouped_parameters = [
                 {'params': [p for n, p in param_optimizer if n in ('transitions', 'classifier.weight')],
                  'lr': params.lr0_crf, 'weight_decay': params.weight_decay_crf},
                 {'params': [p for n, p in param_optimizer if n == 'classifier.bias'],
                  'lr': params.lr0_crf, 'weight_decay': 0.0}]
         else:
+            param_optimizer = list(model.classifier.named_parameters())
             optimizer_grouped_parameters = [{'params': [p for n, p in param_optimizer]}]
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=params.learning_rate, correct_bias=False)
