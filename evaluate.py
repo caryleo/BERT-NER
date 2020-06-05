@@ -58,7 +58,7 @@ def evaluate(model, data_iterator, params, mark='Eval', verbose=False):
             batch_output_argmax = [batch_output]  # only for batch_size=1,to be modified later.
         loss_avg.update(loss.item())
 
-        # batch_tags = batch_tags.to('cpu').numpy()
+        batch_tags = batch_tags.to('cpu').numpy()
 
         pred_tags.extend([[idx2tag.get(idx) for idx in indices] for indices in batch_output_argmax])
         true_tags.extend([[idx2tag.get(idx) if idx != -1 else 'O' for idx in indices] for indices in batch_tags])
