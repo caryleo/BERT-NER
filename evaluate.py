@@ -9,6 +9,7 @@ import numpy as np
 from data_loader import DataLoader
 from SequenceTagger import BertForSequenceTagging
 from CRFTagger import BertForCRFTagging
+from CRFTagger2 import BertForCRFTagging2
 from metrics import f1_score, get_entities, classification_report
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -16,7 +17,7 @@ from metrics import f1_score, get_entities, classification_report
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='conll', help="Directory containing the dataset")
 parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
-parser.add_argument('--model', default='linear', choices=['linear', 'crf'], help="The Model we want to use")
+parser.add_argument('--model', default='linear', choices=['linear', 'crf', 'crf2'], help="The Model we want to use")
 
 
 # test for git push
@@ -43,19 +44,27 @@ def evaluate(model, data_iterator, params, mark='Eval', verbose=False):
         if params.model == 'linear':
             loss = \
                 model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks,
-                      labels=batch_tags)[
-                    0]
+                      labels=batch_tags)[0]
             batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[
                 0]  # shape: (batch_size, max_len, num_labels)
             batch_output = batch_output.detach().cpu().numpy()  # must sent to cpu to use numpy
             batch_output_argmax = np.argmax(batch_output, axis=2)
-        else:
+        elif params.model == 'crf':
             batch_tags_crf = batch_tags.squeeze(0)
             loss = model.neg_log_likelihood((batch_data, batch_token_starts), token_type_ids=None,
                                             attention_mask=batch_masks, labels=batch_tags_crf)
             batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[
                 1]  # list of the tag index of each word e./[0,0,1,2,1],denoting the index of a tag.
             batch_output_argmax = [batch_output]  # only for batch_size=1,to be modified later.
+
+        elif params.model == 'crf2':
+            outputs = \
+                model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks,
+                      labels=batch_tags)
+
+            loss, logits = outputs
+
+            batch_output_argmax = model.crf.decode(logits, batch_masks, pad_tag=-1)
 
         loss_avg.update(loss.item())
 
@@ -143,7 +152,13 @@ if __name__ == '__main__':
     data_loader = DataLoader(data_dir, bert_class, params, token_pad_idx=0, tag_pad_idx=-1)
 
     # Load the model
-    model = BertForSequenceTagging.from_pretrained(tagger_model_dir)
+    if params.model == 'linear':
+        model = BertForSequenceTagging.from_pretrained(tagger_model_dir)
+    elif params.model == 'crf':
+        model = BertForCRFTagging.from_pretrained(tagger_model_dir)
+        model.load_option(params)
+    elif params.model == 'crf2':
+        model = BertForCRFTagging2.from_pretrained(tagger_model_dir)
     model.to(params.device)
 
     # Load data

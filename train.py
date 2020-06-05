@@ -11,6 +11,7 @@ from evaluate import evaluate
 from data_loader import DataLoader
 from SequenceTagger import BertForSequenceTagging
 from CRFTagger import BertForCRFTagging
+from CRFTagger2 import BertForCRFTagging2
 from transformers.optimization import get_linear_schedule_with_warmup, AdamW
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -21,7 +22,7 @@ parser.add_argument('--dataset', default='conll', help="Directory containing the
 parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
 parser.add_argument('--restore_dir', default=None,
                     help="Optional, name of the directory containing weights to reload before training, e.g., 'experiments/conll/'")
-parser.add_argument('--model', default='linear', choices=['linear', 'crf'], help="The Model we want to use")
+parser.add_argument('--model', default='linear', choices=['linear', 'crf', 'crf2'], help="The Model we want to use")
 
 
 def train_epoch(model, data_iterator, optimizer, scheduler, params):
@@ -44,7 +45,7 @@ def train_epoch(model, data_iterator, optimizer, scheduler, params):
             loss = \
                 model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks,
                       labels=batch_tags)[0]
-        else:
+        elif params.model == 'crf':
             batch_tags_crf = batch_tags.squeeze(0)
             loss = model.neg_log_likelihood((batch_data, batch_token_starts), token_type_ids=None,
                                             attention_mask=batch_masks, labels=batch_tags_crf)
@@ -176,9 +177,12 @@ if __name__ == '__main__':
     # Prepare model
     if params.model == 'linear':
         model = BertForSequenceTagging.from_pretrained(bert_class, num_labels=len(params.tag2idx))
-    else:
+    elif params.model == 'crf':
         model = BertForCRFTagging.from_pretrained(bert_class, num_labels=len(params.tag2idx))
         model.load_option(params)
+    elif params.model == 'crf2':
+        model = BertForCRFTagging2.from_pretrained(bert_class, num_labels=len(params.tag2idx))
+
     model.to(params.device)
 
     # Prepare optimizer
@@ -195,8 +199,7 @@ if __name__ == '__main__':
         else:  # only finetune the head classifier and vitebi
             param_optimizer = list(model.classifier.named_parameters())
             optimizer_grouped_parameters = [{'params': [p for n, p in param_optimizer]}]
-
-    else:
+    elif params.model == 'crf':
         param_optimizer = list(model.named_parameters())
         if params.full_finetuning:
             no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
@@ -217,6 +220,43 @@ if __name__ == '__main__':
                     , 'lr': params.lr0_crf, 'weight_decay': params.weight_decay_crf},
                 {'params': [p for n, p in param_optimizer if n == 'classifier.bias'] \
                     , 'lr': params.lr0_crf, 'weight_decay': 0.0}]
+
+    elif params.model == 'crf2':
+        no_decay = ["bias", "LayerNorm.weight"]
+        bert_param_optimizer = list(model.bert.named_parameters())
+        crf_param_optimizer = list(model.crf.named_parameters())
+        linear_param_optimizer = list(model.classifier.named_parameters())
+        if params.full_finetuning:
+            optimizer_grouped_parameters = [
+                {'params': [p for n, p in bert_param_optimizer if not any(nd in n for nd in no_decay)],
+                 'weight_decay': args.weight_decay, 'lr': args.learning_rate},
+                {'params': [p for n, p in bert_param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0,
+                 'lr': args.learning_rate},
+
+                {'params': [p for n, p in crf_param_optimizer if not any(nd in n for nd in no_decay)],
+                 'weight_decay': args.weight_decay, 'lr': args.crf_learning_rate},
+                {'params': [p for n, p in crf_param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0,
+                 'lr': args.crf_learning_rate},
+
+                {'params': [p for n, p in linear_param_optimizer if not any(nd in n for nd in no_decay)],
+                 'weight_decay': args.weight_decay, 'lr': args.crf_learning_rate},
+                {'params': [p for n, p in linear_param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0,
+                 'lr': args.crf_learning_rate}
+            ]
+        else:
+            optimizer_grouped_parameters = [
+                {'params': [p for n, p in crf_param_optimizer if not any(nd in n for nd in no_decay)],
+                 'weight_decay': args.weight_decay, 'lr': args.crf_learning_rate},
+                {'params': [p for n, p in crf_param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0,
+                 'lr': args.crf_learning_rate},
+
+                {'params': [p for n, p in linear_param_optimizer if not any(nd in n for nd in no_decay)],
+                 'weight_decay': args.weight_decay, 'lr': args.crf_learning_rate},
+                {'params': [p for n, p in linear_param_optimizer if any(nd in n for nd in no_decay)],
+                 'weight_decay': 0.0,
+                 'lr': args.crf_learning_rate}
+            ]
+
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=params.learning_rate, correct_bias=False)
     train_steps_per_epoch = params.train_size // params.batch_size

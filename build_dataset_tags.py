@@ -5,7 +5,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='conll', help="Directory containing the dataset")
-parser.add_argument('--model', default='linear', choices=['linear', 'crf'], help="The Model we want to use")
+parser.add_argument('--model', default='linear', choices=['linear', 'crf', 'crf2'], help="The Model we want to use")
 
 
 def load_dataset(path_dataset):
@@ -72,7 +72,7 @@ def build_tags(data_dir, tags_file, model):
                 tags.update(list(tag_seq))
     tags = sorted(tags)
     with open(tags_file, 'w') as file:
-        if model == 'linear':
+        if model == 'linear' or model == 'crf2':
             file.write('\n'.join(tags))
         else:
             file.write('\n'.join(tags + ['<START>', '<STOP>']))

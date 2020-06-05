@@ -1,5 +1,5 @@
 {
-    "full_finetuning": true,
+    "full_finetuning": false,
     "max_len": 135,
 
     "learning_rate": 5e-5,
