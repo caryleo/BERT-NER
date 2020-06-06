@@ -251,15 +251,15 @@ if __name__ == '__main__':
         else:
             optimizer_grouped_parameters = [
                 {'params': [p for n, p in crf_param_optimizer if not any(nd in n for nd in no_decay)],
-                 'weight_decay': args.weight_decay, 'lr': args.crf_learning_rate},
+                 'weight_decay': params.weight_decay, 'lr': params.crf_learning_rate},
                 {'params': [p for n, p in crf_param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0,
-                 'lr': args.crf_learning_rate},
+                 'lr': params.crf_learning_rate},
 
                 {'params': [p for n, p in linear_param_optimizer if not any(nd in n for nd in no_decay)],
-                 'weight_decay': args.weight_decay, 'lr': args.crf_learning_rate},
+                 'weight_decay': params.weight_decay, 'lr': params.crf_learning_rate},
                 {'params': [p for n, p in linear_param_optimizer if any(nd in n for nd in no_decay)],
                  'weight_decay': 0.0,
-                 'lr': args.crf_learning_rate}
+                 'lr': params.crf_learning_rate}
             ]
 
 

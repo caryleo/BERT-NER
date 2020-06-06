@@ -422,6 +422,7 @@ class BertForCRFTagging2(BertPreTrainedModel):
         self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+        self.softmax = nn.Softmax()
         self.crf = CRF(num_tags=config.num_labels, batch_first=True)
 
         self.init_weights()
@@ -473,7 +474,7 @@ class BertForCRFTagging2(BertPreTrainedModel):
             #     loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
             # outputs = (loss,) + outputs
 
-            # logits = nn.Softmax(logits, dim=2)
+            # logits = self.softmax(logits, dim=2)
 
             loss_mask = labels.gt(-1)
             loss = self.crf(emissions=logits, tags=labels, mask=loss_mask)
