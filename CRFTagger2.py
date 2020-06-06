@@ -473,7 +473,7 @@ class BertForCRFTagging2(BertPreTrainedModel):
             #     loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
             # outputs = (loss,) + outputs
 
-            length = logits.shape[1]
+            # logits = nn.Softmax(logits, dim=2)
 
             loss_mask = labels.gt(-1)
             loss = self.crf(emissions=logits, tags=labels, mask=loss_mask)
