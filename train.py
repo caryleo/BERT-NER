@@ -49,6 +49,10 @@ def train_epoch(model, data_iterator, optimizer, scheduler, params):
             batch_tags_crf = batch_tags.squeeze(0)
             loss = model.neg_log_likelihood((batch_data, batch_token_starts), token_type_ids=None,
                                             attention_mask=batch_masks, labels=batch_tags_crf)
+        elif params.model=='crf2':
+            loss = \
+                model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks,
+                      labels=batch_tags)[0]
 
         # clear previous gradients, compute gradients of all variables wrt loss
         model.zero_grad()
