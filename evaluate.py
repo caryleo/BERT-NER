@@ -149,6 +149,8 @@ if __name__ == '__main__':
         bert_class = 'bert-base-chinese'  # auto
         # bert_class = 'pretrained_bert_models/bert-base-chinese/' # manual
 
+    if params.model == 'crf':
+        params.batch_size=1
     data_loader = DataLoader(data_dir, bert_class, params, token_pad_idx=0, tag_pad_idx=-1)
 
     # Load the model
