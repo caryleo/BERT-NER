@@ -64,16 +64,27 @@ def evaluate(model, data_iterator, params, mark='Eval', verbose=False):
 
             loss, logits = outputs
 
-            batch_output_argmax = model.crf.decode(logits, batch_masks, pad_tag=-1)
+            masks = batch_tags.gt(-1)
+            batch_output = model.crf.decode(logits, masks, pad_tag=-1)[0]
+            batch_output = batch_output.detach().cpu().numpy()
+            batch_output_argmax = batch_output
 
         loss_avg.update(loss.item())
 
         batch_tags = batch_tags.to('cpu').numpy()
 
-        pred_tags.extend([[idx2tag.get(idx) for idx in indices] for indices in batch_output_argmax])
+        # print(batch_output_argmax[0])
+        # print(batch_tags[0])
+
+        pred_tags.extend([[idx2tag.get(idx) if idx != -1 else 'O' for idx in indices] for indices in batch_output_argmax])
         true_tags.extend([[idx2tag.get(idx) if idx != -1 else 'O' for idx in indices] for indices in batch_tags])
 
-    assert len(pred_tags) == len(true_tags)
+        # print(pred_tags[0])
+        # print(true_tags[0])
+
+    assert len(pred_tags) == len(true_tags), f'Pred Length: {len(pred_tags)}, True Length: {len(true_tags)}'
+    # print(pred_tags)
+    # print(true_tags)
 
     # logging loss, f1 and report
     metrics = {}

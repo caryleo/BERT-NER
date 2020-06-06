@@ -6,6 +6,8 @@
     "weight_decay": 0.01,
     "clip_grad": 5,
 
+    "crf_learning_rate": 1e-3,
+
     "lr0_crf": 8e-5,
     "weight_decay_crf": 0.005,
 

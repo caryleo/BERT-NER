@@ -433,6 +433,7 @@ class BertForCRFTagging2(BertPreTrainedModel):
         # print("input_token_starts", input_token_starts.shape)
         # print("attention_mask", attention_mask.shape)
         # print("labels", labels.shape)
+
         outputs = self.bert(input_ids,
                             attention_mask=attention_mask,
                             token_type_ids=token_type_ids,
@@ -447,12 +448,16 @@ class BertForCRFTagging2(BertPreTrainedModel):
         origin_sequence_output = [
             layer[starts.nonzero().squeeze(1)]
             for layer, starts in zip(sequence_output, input_token_starts)]
+        # for layer in origin_sequence_output:
+            # print(layer.shape)
         padded_sequence_output = pad_sequence(origin_sequence_output, batch_first=True)
         # print("padded_sequence_output", padded_sequence_output.shape)
         padded_sequence_output = self.dropout(padded_sequence_output)
         #### 'X' label Issue End ####
 
         logits = self.classifier(padded_sequence_output)
+
+        # print(logits.shape)
 
         outputs = (logits,)
         if labels is not None:
@@ -468,7 +473,10 @@ class BertForCRFTagging2(BertPreTrainedModel):
             #     loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
             # outputs = (loss,) + outputs
 
-            loss = self.crf(emissions=logits, tags=labels, mask=attention_mask)
+            length = logits.shape[1]
+
+            loss_mask = labels.gt(-1)
+            loss = self.crf(emissions=logits, tags=labels, mask=loss_mask)
             outputs = (-1 * loss, ) + outputs
 
         return outputs  # (loss), scores

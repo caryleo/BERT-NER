@@ -50,6 +50,7 @@ def train_epoch(model, data_iterator, optimizer, scheduler, params):
             loss = model.neg_log_likelihood((batch_data, batch_token_starts), token_type_ids=None,
                                             attention_mask=batch_masks, labels=batch_tags_crf)
         elif params.model=='crf2':
+            # print(batch_masks[18, 59:71])
             loss = \
                 model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks,
                       labels=batch_tags)[0]
@@ -233,19 +234,19 @@ if __name__ == '__main__':
         if params.full_finetuning:
             optimizer_grouped_parameters = [
                 {'params': [p for n, p in bert_param_optimizer if not any(nd in n for nd in no_decay)],
-                 'weight_decay': args.weight_decay, 'lr': args.learning_rate},
+                 'weight_decay': params.weight_decay, 'lr': params.learning_rate},
                 {'params': [p for n, p in bert_param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0,
-                 'lr': args.learning_rate},
+                 'lr': params.learning_rate},
 
                 {'params': [p for n, p in crf_param_optimizer if not any(nd in n for nd in no_decay)],
-                 'weight_decay': args.weight_decay, 'lr': args.crf_learning_rate},
+                 'weight_decay': params.weight_decay, 'lr': params.crf_learning_rate},
                 {'params': [p for n, p in crf_param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0,
-                 'lr': args.crf_learning_rate},
+                 'lr': params.crf_learning_rate},
 
                 {'params': [p for n, p in linear_param_optimizer if not any(nd in n for nd in no_decay)],
-                 'weight_decay': args.weight_decay, 'lr': args.crf_learning_rate},
+                 'weight_decay': params.weight_decay, 'lr': params.crf_learning_rate},
                 {'params': [p for n, p in linear_param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0,
-                 'lr': args.crf_learning_rate}
+                 'lr': params.crf_learning_rate}
             ]
         else:
             optimizer_grouped_parameters = [
