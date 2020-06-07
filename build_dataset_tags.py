@@ -4,18 +4,18 @@ import random
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', default='conll', help="Directory containing the dataset")
+parser.add_argument('--dataset', default='conll', choices=['conll', 'msra', 'wnu', 'cner'], help="Directory containing the dataset")
 parser.add_argument('--model', default='linear', choices=['linear', 'crf', 'crf2'], help="The Model we want to use")
 
 
-def load_dataset(path_dataset):
+def load_dataset(path_dataset, arg):
     """Load dataset into memory from text file"""
     dataset = []
     with open(path_dataset) as f:
         words, tags = [], []
         # Each line of the file corresponds to one word and tag
         for line in f:
-            if line != '\n':
+            if line != '\n' and line != '\t\n':
                 line = line.strip('\n')
                 if len(line.split()) > 1:
                     word = line.split()[0]
@@ -27,6 +27,13 @@ def load_dataset(path_dataset):
                     if len(word) > 0 and len(tag) > 0:
                         word, tag = str(word), str(tag)
                         words.append(word)
+                        if args.dataset == 'cner': # BMES标注，替换为BIO，规则：B -> B，M -> I，E -> I，S -> B
+                            if tag[0] == 'M':
+                                tag = 'I' + tag[1:]
+                            if tag[0] == 'E':
+                                tag = 'I' + tag[1:]
+                            if tag[0] == 'S':
+                                tag = 'B' + tag[1:]
                         tags.append(tag)
                 except Exception as e:
                     print('An exception was raised, skipping a word: {}'.format(e))
@@ -93,10 +100,10 @@ if __name__ == '__main__':
 
     # Load the dataset into memory
     print('Loading ' + args.dataset.upper() + ' dataset into memory...')
-    train = load_dataset(path_train)
-    test = load_dataset(path_test)
+    train = load_dataset(path_train, args)
+    test = load_dataset(path_test, args)
     if os.path.exists(path_val):
-        val = load_dataset(path_val)
+        val = load_dataset(path_val, args)
     else:
         total_train_len = len(train)
         split_val_len = int(total_train_len * 0.05)

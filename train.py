@@ -18,7 +18,7 @@ from transformers.optimization import get_linear_schedule_with_warmup, AdamW
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', default='conll', help="Directory containing the dataset")
+parser.add_argument('--dataset', default='conll', choices=['conll', 'msra', 'wnu', 'cner'], help="Directory containing the dataset")
 parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
 parser.add_argument('--restore_dir', default=None,
                     help="Optional, name of the directory containing weights to reload before training, e.g., 'experiments/conll/'")
@@ -158,10 +158,10 @@ if __name__ == '__main__':
     # Initialize the DataLoader
     data_dir = 'data/' + args.dataset
 
-    if args.dataset in ["conll"]:
+    if args.dataset in ["conll", "wnu"]:
         bert_class = 'bert-base-cased'  # auto
         # bert_class = 'pretrained_bert_models/bert-base-cased/' # manual
-    elif args.dataset in ["msra"]:
+    elif args.dataset in ["msra", "cner"]:
         bert_class = 'bert-base-chinese'  # auto
         # bert_class = 'pretrained_bert_models/bert-base-chinese/' # manual
 

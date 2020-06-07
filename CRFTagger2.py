@@ -457,8 +457,9 @@ class BertForCRFTagging2(BertPreTrainedModel):
         #### 'X' label Issue End ####
 
         logits = self.classifier(padded_sequence_output)
-        logits = self.softmax(logits)
+        # logits = self.softmax(logits)
 
+        # print(logits.shape)
         # print(logits.shape)
 
         outputs = (logits,)

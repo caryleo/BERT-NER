@@ -15,7 +15,7 @@ from metrics import f1_score, get_entities, classification_report
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', default='conll', help="Directory containing the dataset")
+parser.add_argument('--dataset', default='conll', choices=['conll', 'msra', 'wnu', 'cner'], help="Directory containing the dataset")
 parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
 parser.add_argument('--model', default='linear', choices=['linear', 'crf', 'crf2'], help="The Model we want to use")
 
@@ -64,10 +64,14 @@ def evaluate(model, data_iterator, params, mark='Eval', verbose=False):
 
             loss, logits = outputs
 
+            # print(logits[0])
+
             masks = batch_tags.gt(-1)
             batch_output = model.crf.decode(logits, masks, pad_tag=-1)[0]
             batch_output = batch_output.detach().cpu().numpy()
             batch_output_argmax = batch_output
+
+            # print(batch_output_argmax[0])
 
         loss_avg.update(loss.item())
 
@@ -153,10 +157,10 @@ if __name__ == '__main__':
     # Initialize the DataLoader
     data_dir = 'data/' + args.dataset
 
-    if args.dataset in ["conll"]:
+    if args.dataset in ["conll", "wnr"]:
         bert_class = 'bert-base-cased'  # auto
         # bert_class = 'pretrained_bert_models/bert-base-cased/' # manual
-    elif args.dataset in ["msra"]:
+    elif args.dataset in ["msra", "cner"]:
         bert_class = 'bert-base-chinese'  # auto
         # bert_class = 'pretrained_bert_models/bert-base-chinese/' # manual
 
