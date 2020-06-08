@@ -10,14 +10,17 @@ import utils as utils
 from metrics import get_entities
 from data_loader import DataLoader
 from SequenceTagger import BertForSequenceTagging
+from CRFTagger import BertForCRFTagging
+from CRFTagger2 import BertForCRFTagging2
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='msra', help="Directory containing the dataset")
 parser.add_argument('--seed', type=int, default=2020, help="random seed for initialization")
+parser.add_argument('--model', default='linear', choices=['linear', 'crf', 'crf2'], help="The Model we want to use")
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-def interAct(model, data_iterator, params, mark='Interactive', verbose=False):
+def interAct(model, data_iterator, params,seq_len,mark='Interactive', verbose=False):
     """Evaluate the model on `steps` batches."""
     # set model to evaluation mode
     model.eval()
@@ -25,13 +28,29 @@ def interAct(model, data_iterator, params, mark='Interactive', verbose=False):
 
     batch_data, batch_token_starts = next(data_iterator)
     batch_masks = batch_data.gt(0)
-        
-    batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[0]  # shape: (batch_size, max_len, num_labels)
-    batch_output = batch_output.detach().cpu().numpy()
+
+    if params.model == 'linear':
+        batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[
+            0]  # shape: (batch_size, max_len, num_labels)
+        batch_output = batch_output.detach().cpu().numpy()  # must sent to cpu to use numpy
+        batch_output_argmax = np.argmax(batch_output, axis=2)
+    elif params.model == 'crf':
+        batch_output = model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)[
+            1]  # list of the tag index of each word e./[0,0,1,2,1],denoting the index of a tag.
+        batch_output_argmax = [batch_output]  # only for batch_size=1,to be modified later.
+
+    elif params.model == 'crf2':
+        outputs = \
+            model((batch_data, batch_token_starts), token_type_ids=None, attention_mask=batch_masks)
+        logits = outputs[0]
+        masks=torch.full((1,seq_len),True).to(params.device)
+        # masks = batch_tags.gt(-1)
+        batch_output = model.crf.decode(logits, masks, pad_tag=-1)[0]
+        batch_output = batch_output.detach().cpu().numpy()
+        batch_output_argmax = batch_output
     
     pred_tags = []
-    pred_tags.extend([[idx2tag.get(idx) for idx in indices] for indices in np.argmax(batch_output, axis=2)])
-    
+    pred_tags.extend([[idx2tag.get(idx) if idx != -1 else 'O' for idx in indices] for indices in batch_output_argmax])
     return(get_entities(pred_tags))
 
 
@@ -51,6 +70,7 @@ def bert_ner_init():
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     params.seed = args.seed
+    params.model = args.model
 
     # Set the logger
     utils.set_logger(os.path.join(tagger_model_dir, 'evaluate.log'))
@@ -60,33 +80,46 @@ def bert_ner_init():
 
     # Initialize the DataLoader
     data_dir = 'data/' + args.dataset
-    if args.dataset in ["conll"]:
-        bert_class = 'bert-base-cased'
-    elif args.dataset in ["msra"]:
-        bert_class = 'bert-base-chinese'
+    if args.dataset in ["conll", "wnr"]:
+        bert_class = 'bert-base-cased'  # auto
+        # bert_class = 'pretrained_bert_models/bert-base-cased/' # manual
+    elif args.dataset in ["msra", "cner"]:
+        bert_class = 'bert-base-chinese'  # auto
+        # bert_class = 'pretrained_bert_models/bert-base-chinese/' # manual
 
+    if params.model == 'crf':
+        params.batch_size=1
     data_loader = DataLoader(data_dir, bert_class, params, token_pad_idx=0, tag_pad_idx=-1)
 
     # Load the model
-    model = BertForSequenceTagging.from_pretrained(tagger_model_dir)
+    # Load the model
+    if params.model == 'linear':
+        model = BertForSequenceTagging.from_pretrained(tagger_model_dir)
+    elif params.model == 'crf':
+        model = BertForCRFTagging.from_pretrained(tagger_model_dir)
+        model.load_option(params)
+    elif params.model == 'crf2':
+        model = BertForCRFTagging2.from_pretrained(tagger_model_dir)
+    # model = BertForSequenceTagging.from_pretrained(tagger_model_dir)
     model.to(params.device)
 
     return model, data_loader, args.dataset, params
 
 def BertNerResponse(model, queryString):    
     model, data_loader, dataset, params = model
-    if dataset in ['msra']:
+    if dataset in ["msra", "cner"]:
         queryString = [i for i in queryString]
-    elif dataset in ['conll']:
+    elif dataset in ["conll", "wnr"]:
         queryString = nltk.word_tokenize(queryString)
 
+    seq_len=len(queryString)
 
     with open('data/' + dataset + '/interactive/sentences.txt', 'w') as f:
         f.write(' '.join(queryString))
 
     inter_data = data_loader.load_data('interactive')
     inter_data_iterator = data_loader.data_iterator(inter_data, shuffle=False)
-    result = interAct(model, inter_data_iterator, params)
+    result = interAct(model, inter_data_iterator, params,seq_len=seq_len)
     res = []
     for item in result:
         if dataset in ['msra']:
